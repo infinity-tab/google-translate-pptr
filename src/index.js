@@ -7,10 +7,13 @@ const fastify = Fastify({ logger: true });
 
 fastify.register(fCors, {});
 
+const pageCount = 5;
+const headless = true;
+
 const start = async () => {
   try {
-    const browser = await puppeteer.launch();
-    const pagePool = new PagePool(browser);
+    const browser = await puppeteer.launch({ headless });
+    const pagePool = new PagePool(browser, pageCount);
     await pagePool.init();
 
     fastify.post("/translate", async (request, reply) => {
@@ -21,39 +24,15 @@ const start = async () => {
       const from = Object.values(items)[0];
       const toLen = toArr.length;
 
-      const { pageCount } = pagePool;
-
       const result = [];
 
-      const splitCount = Math.floor(toLen / pageCount);
-
-      for (let i = 0; i < splitCount; ++i) {
-        const tasks = [];
-
-        for (let toIndex = 0; toIndex < pageCount; ++toIndex) {
-          const page = pagePool.getPage();
-
-          const to = toArr[toIndex + i * pageCount];
-
-          tasks.push(toTranslate(page, { from, to, text: str }));
-        }
-
-        const transArr = await Promise.all(tasks);
-        result.push(...transArr);
+      const tasks = [];
+      for (let i = 0; i < toLen; ++i) {
+        tasks.push(toTranslate(pagePool, { from, to: toArr[i], text: str }));
       }
 
-      const restCount = toLen % pageCount;
-
-      if (restCount > 0) {
-        const tasks = [];
-        for (let toIndex = pageCount * splitCount; toIndex < toLen; ++toIndex) {
-          const page = pagePool.getPage();
-          const to = toArr[toIndex];
-          tasks.push(toTranslate(page, { from, to, text: str }));
-        }
-        const transArr = await Promise.all(tasks);
-        result.push(...transArr);
-      }
+      const transArr = await Promise.all(tasks);
+      result.push(...transArr);
 
       const data = result.reduce((_, [to, text]) => {
         _[to] = text;
@@ -80,14 +59,16 @@ start();
 
 /**
  *
- * @param { import('puppeteer').Page } page
+ * @param { PagePool } pool
  * @param { { from: string, to: string, text: string } } param1
  * @returns { Promise<[string, string]> } // tuple
  */
-async function toTranslate(page, { from, to, text }) {
+async function toTranslate(pool, { from, to, text }) {
   if (from === to) {
     return [to, text];
   }
+
+  const page = await pool.getPage();
 
   await page.evaluate(
     ([from, to, text]) => {
@@ -110,6 +91,8 @@ async function toTranslate(page, { from, to, text }) {
   if (transResult.endsWith(".")) {
     transResult = transResult.replace(/\.$/, "");
   }
+
+  pool.releasePage(page);
 
   // get translated text
   return [to, transResult];

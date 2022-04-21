@@ -1,13 +1,17 @@
 export default class PagePool {
-  _pages = [];
-  _pagesInUse = [];
+  #pages = [];
+  #pagesInUse = new WeakMap();
+
+  #pageLockList = [];
+
   constructor(browser, pageCount = 5, tld = "cn") {
     this.pageCount = pageCount;
     this.browser = browser;
     this.tld = tld;
   }
+
   async init() {
-    this._pages = await Promise.all(
+    this.#pages = await Promise.all(
       [...Array(this.pageCount)].map(() =>
         this.browser.newPage().then(async (page) => {
           await page.goto(`https://translate.google.${this.tld}/`, {
@@ -19,17 +23,51 @@ export default class PagePool {
     );
   }
 
+  rCount = 0;
+  /**
+   * @param { import('puppeteer').Page } page
+   */
+  releasePage(page) {
+    console.info("releasePage: ", ++this.rCount);
+    if (this.#pagesInUse.has(page)) {
+      this.#pagesInUse.delete(page);
+      this.#pages.push(page);
+
+      if (this.#pageLockList.length > 0) {
+        const [_, releaseLock] = this.#pageLockList.pop();
+        releaseLock();
+      }
+    }
+  }
+
+  aCount = 0;
   /**
    *
-   * @returns { import('puppeteer').Page }
+   * @returns { Promise<import('puppeteer').Page> }
    */
-  getPage() {
-    if (this._pages.length === 0) {
-      this._pages = this._pagesInUse;
-      this._pagesInUse = [];
+  async getPage() {
+    if (this.#pages.length === 0) {
+      const [lock, releaseLock] = createPromise();
+      this.#pageLockList.push([lock, releaseLock]);
+      await lock;
     }
-    const page = this._pages.pop();
-    this._pagesInUse.push(page);
+
+    console.info("getPage:", ++this.aCount);
+
+    const page = this.#pages.pop();
+    this.#pagesInUse.set(page, 1);
+
     return page;
   }
+}
+
+function createPromise() {
+  let resolve, reject;
+
+  const p = new Promise((r1, r2) => {
+    resolve = r1;
+    reject = r2;
+  });
+
+  return [p, resolve, reject];
 }
