@@ -28,7 +28,6 @@ export default class PagePool {
    * @param { import('puppeteer').Page } page
    */
   releasePage(page) {
-    console.info("releasePage: ", ++this.rCount);
     if (this.#pagesInUse.has(page)) {
       this.#pagesInUse.delete(page);
       this.#pages.push(page);
@@ -51,8 +50,6 @@ export default class PagePool {
       this.#pageLockList.push([lock, releaseLock]);
       await lock;
     }
-
-    console.info("getPage:", ++this.aCount);
 
     const page = this.#pages.pop();
     this.#pagesInUse.set(page, 1);
