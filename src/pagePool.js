@@ -4,6 +4,12 @@ export default class PagePool {
 
   #pageLockList = [];
 
+  /**
+   *
+   * @param { import('puppeteer').Browser } browser
+   * @param { number } [pageCount ]
+   * @param { string } [tld]
+   */
   constructor(browser, pageCount = 5, tld = "cn") {
     this.pageCount = pageCount;
     this.browser = browser;
