@@ -3,9 +3,9 @@ import PagePool from "./pagePool.js";
 /**
  *
  * @param { import('puppeteer').Browser } browser
- * @param { { pageCount?: number, tld?: string } } params
+ * @param { { pageCount?: number, tld?: string } } [params]
  */
-const start = async (browser, { pageCount, tld }) => {
+const start = async (browser, { pageCount, tld } = {} ) => {
   const pagePool = new PagePool(browser, pageCount, tld);
   await pagePool.init();
 
