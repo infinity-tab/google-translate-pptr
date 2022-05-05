@@ -39,7 +39,8 @@ const start = async ()=>{
   const browser = await puppeteer.launch()
   const translate = await Translate(browser, { pageCount: 10, tld: "cn" })
 
-  const resultText = await translate("Hello", {from: 'en', to: 'zh-CN'}) // 你好
+  const {to, from, text} = await translate("Hello", {from: 'en', to: 'zh-CN'})
+  // text -> 你好
 }
 
 start()
